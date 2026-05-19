@@ -1,0 +1,232 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+}
+
+body {
+    background: #f4f7fc;
+    color: #1e293b;
+}
+
+.app-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+/* Header & Navigation */
+.main-header {
+    background: white;
+    border-radius: 2rem;
+    padding: 1rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+    border: 1px solid #e9edf2;
+    margin-bottom: 2rem;
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+.logo-icon { font-size: 2rem; }
+.logo-text span { color: #2c7a4d; }
+
+.main-nav {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+.nav-btn {
+    background: transparent;
+    border: none;
+    padding: 0.6rem 1.3rem;
+    border-radius: 2rem;
+    font-size: 0.95rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: 0.2s;
+    color: #334155;
+}
+.nav-btn:hover {
+    background: #eef2ff;
+}
+.nav-btn.active {
+    background: #2c7a4d;
+    color: white;
+}
+
+/* контентная область */
+.content-area {
+    flex: 1;
+    background: white;
+    border-radius: 2rem;
+    padding: 2rem;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.05);
+    border: 1px solid #eef2f8;
+    transition: all 0.2s;
+}
+
+/* карточки продуктов, формы – копируем из предыдущего решения, но без дублирования хедера */
+/* загрузчик */
+.loading-placeholder {
+    text-align: center;
+    padding: 2rem;
+    color: #2c7a4d;
+}
+.spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid #e2e8f0;
+    border-top: 3px solid #2c7a4d;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    margin: 0 auto 1rem;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* общие стили карточек продуктов и форм (из предыдущего ответа) */
+.results-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1.6rem;
+    margin-top: 1.5rem;
+}
+.product-card {
+    background: #ffffff;
+    border-radius: 1.5rem;
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    border: 1px solid #eef2f8;
+    transition: 0.2s;
+}
+.product-card:hover { transform: translateY(-4px); }
+.product-image {
+    background: #f1f5f9;
+    height: 160px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.product-image img { max-width: 100%; max-height: 140px; object-fit: contain; }
+.image-placeholder {
+    width: 80px; height: 80px;
+    background: #e2e8f0;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+}
+.product-info { padding: 1rem 1.2rem 1.2rem; display: flex; flex-direction: column; gap: 6px; }
+.product-title { font-weight: 700; font-size: 1rem; }
+.brand { font-size: 0.8rem; color: #2c7a4d; }
+.quantity { font-size: 0.75rem; color: #5b6e8c; }
+.nutri-badge {
+    width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center;
+    font-weight: 800; border-radius: 12px; text-transform: uppercase; color: white;
+}
+.nutri-a { background: #2b7e3a; }
+.nutri-b { background: #6baa46; }
+.nutri-c { background: #f5b342; }
+.nutri-d { background: #ea7e3e; }
+.nutri-e { background: #cc2a2a; }
+.nutrition-block {
+    background: #f8fafc;
+    border-radius: 16px;
+    padding: 10px;
+    margin-top: 8px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px 12px;
+    font-size: 0.75rem;
+}
+.nutri-item { display: flex; justify-content: space-between; }
+.nutri-value { font-weight: 700; }
+.no-nutri { grid-column: span 2; text-align: center; color: #94a3b8; }
+
+/* формы калькулятора */
+.form-group {
+    margin-bottom: 1.2rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem;
+}
+.form-group label { min-width: 130px; font-weight: 600; }
+input, select {
+    padding: 0.6rem 0.8rem;
+    border-radius: 1rem;
+    border: 1px solid #cbd5e1;
+}
+.radio-group { display: flex; gap: 1.5rem; flex-wrap: wrap; }
+.calc-btn {
+    background: #2c7a4d; color: white; border: none;
+    padding: 0.7rem 2rem; border-radius: 2rem;
+    font-weight: 600; cursor: pointer;
+}
+.results-cards {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    margin-top: 2rem;
+}
+.kcal-card {
+    flex: 1;
+    min-width: 220px;
+    background: #f9fbfd;
+    border-radius: 1.5rem;
+    padding: 1.2rem;
+    border: 1px solid #eef2f8;
+}
+.kcal-card h4 { color: #1e5631; margin-bottom: 0.5rem; }
+.kcal-value { font-size: 1.8rem; font-weight: 800; margin: 0.5rem 0; }
+.macro-row { display: flex; justify-content: space-between; border-top: 1px solid #e2e8f0; padding-top: 0.6rem; margin-top: 0.6rem; }
+.message {
+    text-align: center;
+    padding: 1rem;
+    background: #fff3e0;
+    border-radius: 1.5rem;
+    margin: 1rem 0;
+}
+.error-text { color: #b91c1c; font-size: 0.85rem; margin-top: 0.5rem; }
+.search-card {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    background: #f8fafc;
+    border-radius: 60px;
+    padding: 0.2rem 0.2rem 0.2rem 1.2rem;
+    border: 1px solid #e2e8f0;
+    margin-bottom: 1.5rem;
+}
+.search-input { flex:1; padding: 0.9rem 0; background: transparent; border: none; font-size: 1rem; outline: none; }
+.search-btn {
+    background: #2c7a4d; border: none; color: white; padding: 0.7rem 1.8rem;
+    border-radius: 40px; font-weight: 600; cursor: pointer;
+}
+footer {
+    margin-top: 2rem;
+    text-align: center;
+    font-size: 0.75rem;
+    color: #6c7e9c;
+}
+@media (max-width: 700px) {
+    .main-header { flex-direction: column; align-items: stretch; text-align: center; }
+    .main-nav { justify-content: center; }
+    .search-card { flex-wrap: wrap; background: white; border-radius: 2rem; padding: 0.8rem; }
+    .search-input { width: 100%; background: #f1f5f9; border-radius: 2rem; padding: 0.8rem 1rem; }
+    .search-btn { width: 100%; }
+}

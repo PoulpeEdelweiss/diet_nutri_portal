@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>NutriPortal — всё о еде и КБЖУ</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%232c7a4d'><path d='M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z'/><circle cx='12' cy='12' r='2'/></svg>">
+</head>
+<body>
+    <div class="app-container">
+        <header class="main-header">
+            <div class="logo">
+                <span class="logo-icon">🥗</span>
+                <span class="logo-text">Nutri<span>Portal</span></span>
+            </div>
+            <nav class="main-nav">
+                <button class="nav-btn active" data-block="welcome">Главная</button>
+                <button class="nav-btn" data-block="search">Поиск продуктов</button>
+                <button class="nav-btn" data-block="calculator">Калькулятор нормы</button>
+            </nav>
+        </header>
+        <main id="app-content" class="content-area">
+            <!-- сюда динамически подгружаются блоки -->
+            <div class="loading-placeholder">Загрузка...</div>
+        </main>
+        <footer class="main-footer">
+            <p>Данные о продуктах — Open Food Facts
+        </footer>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>

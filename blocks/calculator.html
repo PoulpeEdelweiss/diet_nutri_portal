@@ -1,0 +1,32 @@
+<div>
+    <div class="form-group">
+        <label>Пол:</label>
+        <div class="radio-group">
+            <label><input type="radio" name="gender" value="male" checked> Мужчина</label>
+            <label><input type="radio" name="gender" value="female"> Женщина</label>
+        </div>
+    </div>
+    <div class="form-group">
+        <label>Формула:</label>
+        <select id="formulaSelect">
+            <option value="mifflin">Миффлина-Сан Жеора</option>
+            <option value="harris">Харриса-Бенедикта</option>
+        </select>
+    </div>
+    <div class="form-group"><label>Возраст (лет):</label><input type="number" id="age" min="1" max="100" value="30"></div>
+    <div class="form-group"><label>Вес (кг):</label><input type="number" id="weight" value="70" step="0.1"></div>
+    <div class="form-group"><label>Рост (см):</label><input type="number" id="height" value="170"></div>
+    <div class="form-group">
+        <label>Активность:</label>
+        <select id="activity">
+            <option value="1.2">Минимальная (нет спорта)</option>
+            <option value="1.375">Слабая (1-3 дня/нед)</option>
+            <option value="1.55" selected>Средняя (3-5 дней)</option>
+            <option value="1.725">Высокая (6-7 дней)</option>
+            <option value="1.9">Экстра-активность</option>
+        </select>
+    </div>
+    <button id="calcBtn" class="calc-btn">Рассчитать норму</button>
+    <div id="calcError" class="error-text"></div>
+    <div id="kcalResults" class="results-cards"></div>
+</div>
