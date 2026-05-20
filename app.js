@@ -54,7 +54,7 @@ function initSearchModule() {
     const searchBtn = document.getElementById('searchBtn');
     const loader = document.getElementById('searchLoader');
     const resultsDiv = document.getElementById('productResults');
-    
+
     if (!searchBtn) return;
 
     let currentSearchId = 0;
@@ -62,60 +62,15 @@ function initSearchModule() {
     function showLoader(show) {
         if (loader) loader.style.display = show ? 'flex' : 'none';
     }
+
     function showMessage(text, isError = false) {
         if (!resultsDiv) return;
         resultsDiv.innerHTML = `<div class="message" style="${isError ? 'background:#fee2e2; color:#b91c1c' : ''}">${escapeHtml(text)}</div>`;
     }
+
     function escapeHtml(str) {
         if (!str) return '';
-        return str.replace(/[&<>]/g, function(m) {
-            if (m === '&') return '&amp;';
-            if (m === '<') return '&lt;';
-            if (m === '>') return '&gt;';
-            return m;
-        });
-    }
-
-    function renderProducts(products, container) {
-        if (!container || !document.body.contains(container)) return;
-        let html = '<div class="results-grid">';
-        for (const prod of products) {
-            const title = (prod.product_name_ru?.trim()) || prod.product_name || 'Без названия';
-            const brand = prod.brands?.trim() || 'Бренд не указан';
-            const quantity = prod.quantity?.trim() || '—';
-            const imgUrl = prod.image_url || prod.image_front_small_url || null;
-            const n = prod.nutriments || {};
-            const kcal = n['energy-kcal'] !== undefined ? Math.round(n['energy-kcal']) : null;
-            const proteins = n['proteins'] !== undefined ? parseFloat(n['proteins']).toFixed(1) : null;
-            const fat = n['fat'] !== undefined ? parseFloat(n['fat']).toFixed(1) : null;
-            const carbs = n['carbohydrates'] !== undefined ? parseFloat(n['carbohydrates']).toFixed(1) : null;
-            
-            let imageHtml = imgUrl ? `<img src="${imgUrl}" alt="${title}" loading="lazy" onerror="this.parentElement.innerHTML='<div class=\'image-placeholder\'>🥫</div>';">` : `<div class="image-placeholder">🍽️</div>`;
-            let nutritionHtml = '';
-            if (kcal !== null || proteins !== null || fat !== null || carbs !== null) {
-                nutritionHtml = `<div class="nutrition-block">
-                    ${kcal !== null ? `<div class="nutri-item"><span class="nutri-label">🔥 Ккал</span><span class="nutri-value">${kcal}</span></div>` : ''}
-                    ${proteins !== null ? `<div class="nutri-item"><span class="nutri-label">🥩 Белки</span><span class="nutri-value">${proteins} г</span></div>` : ''}
-                    ${fat !== null ? `<div class="nutri-item"><span class="nutri-label">🧈 Жиры</span><span class="nutri-value">${fat} г</span></div>` : ''}
-                    ${carbs !== null ? `<div class="nutri-item"><span class="nutri-label">🍚 Углеводы</span><span class="nutri-value">${carbs} г</span></div>` : ''}
-                </div>`;
-            } else {
-                nutritionHtml = `<div class="nutrition-block"><div class="no-nutri">Нет данных о КБЖУ</div></div>`;
-            }
-            html += `
-                <div class="product-card">
-                    <div class="product-image">${imageHtml}</div>
-                    <div class="product-info">
-                        <div class="product-title">${escapeHtml(title)}</div>
-                        <div class="brand">🏷️ ${escapeHtml(brand)}</div>
-                        <div class="quantity">📦 ${escapeHtml(quantity)}</div>
-                        ${nutritionHtml}
-                    </div>
-                </div>
-            `;
-        }
-        html += '</div>';
-        container.innerHTML = html;
+        return str.replace(/[&<>]/g, m => m === '&' ? '&amp;' : m === '<' ? '&lt;' : '&gt;');
     }
 
     async function performSearch() {
@@ -133,61 +88,78 @@ function initSearchModule() {
         const directUrl = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encoded}&search_simple=1&action=process&json=1&lc=ru&page_size=20`;
         const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(directUrl)}`;
 
-        let attempts = 0;
-        const maxAttempts = 2;
-        let success = false;
+        try {
+            const response = await fetch(proxyUrl, {
+                headers: { 'User-Agent': 'NutriPortal/1.0' }
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-        while (attempts < maxAttempts && !success && searchId === currentSearchId) {
-            attempts++;
-            try {
-                let response;
-                if (attempts === 1) {
-                    response = await fetch(directUrl, {
-                        headers: { 'User-Agent': 'NutriPortal-App/1.0' }
-                    });
-                } else {
-                    response = await fetch(proxyUrl, {
-                        headers: { 'User-Agent': 'NutriPortal-App/1.0' }
-                    });
-                }
+            const data = await response.json();
+            if (searchId !== currentSearchId) return;
 
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const products = data?.products || [];
+            const valid = products.filter(p => p && (p.product_name || p.product_name_ru));
 
-                let data;
-                if (attempts === 2) {
-                    const text = await response.text();
-                    data = JSON.parse(text);
-                } else {
-                    data = await response.json();
-                }
+            if (!resultsDiv || !document.body.contains(resultsDiv)) return;
 
-                if (searchId !== currentSearchId) return;
-
-                let products = data?.products || [];
-                if (!Array.isArray(products)) products = [];
-                const valid = products.filter(p => p && (p.product_name || p.product_name_ru));
-
-                if (!resultsDiv || !document.body.contains(resultsDiv)) return;
-
-                if (valid.length === 0) showMessage('Ничего не найдено');
-                else renderProducts(valid, resultsDiv);
-
-                success = true;
-            } catch (err) {
-                console.warn(`Попытка ${attempts} не удалась:`, err);
-                if (searchId !== currentSearchId) return;
-
-                if (attempts === maxAttempts) {
-                    let msg = 'Ошибка загрузки данных. Проверьте соединение.';
-                    if (err.message.includes('503')) msg = 'Сервер временно недоступен (503). Попробуйте позже.';
-                    else if (err.message.includes('Failed to fetch')) msg = 'Нет соединения с сервером.';
-                    showMessage(msg, true);
-                } else {
-                    await new Promise(r => setTimeout(r, 1000));
-                }
+            if (valid.length === 0) {
+                showMessage('Ничего не найдено');
+            } else {
+                renderProducts(valid, resultsDiv);
             }
+        } catch (err) {
+            if (searchId !== currentSearchId) return;
+            console.error(err);
+            showMessage('Ошибка загрузки. Попробуйте позже.', true);
+        } finally {
+            if (searchId === currentSearchId) showLoader(false);
         }
-        if (searchId === currentSearchId) showLoader(false);
+    }
+
+    function renderProducts(products, container) {
+        if (!container || !document.body.contains(container)) return;
+        let html = '<div class="results-grid">';
+        for (const prod of products) {
+            const title = (prod.product_name_ru?.trim()) || prod.product_name || 'Без названия';
+            const brand = prod.brands?.trim() || 'Бренд не указан';
+            const quantity = prod.quantity?.trim() || '—';
+            const imgUrl = prod.image_url || prod.image_front_small_url || null;
+            const n = prod.nutriments || {};
+            const kcal = n['energy-kcal'] !== undefined ? Math.round(n['energy-kcal']) : null;
+            const proteins = n['proteins'] !== undefined ? parseFloat(n['proteins']).toFixed(1) : null;
+            const fat = n['fat'] !== undefined ? parseFloat(n['fat']).toFixed(1) : null;
+            const carbs = n['carbohydrates'] !== undefined ? parseFloat(n['carbohydrates']).toFixed(1) : null;
+
+            let imageHtml = imgUrl
+                ? `<img src="${imgUrl}" alt="${title}" loading="lazy" onerror="this.parentElement.innerHTML='<div class=\'image-placeholder\'>🥫</div>';">`
+                : `<div class="image-placeholder">🍽️</div>`;
+
+            let nutritionHtml = '';
+            if (kcal !== null || proteins !== null || fat !== null || carbs !== null) {
+                nutritionHtml = `<div class="nutrition-block">
+                    ${kcal !== null ? `<div class="nutri-item"><span class="nutri-label">🔥 Ккал</span><span class="nutri-value">${kcal}</span></div>` : ''}
+                    ${proteins !== null ? `<div class="nutri-item"><span class="nutri-label">🥩 Белки</span><span class="nutri-value">${proteins} г</span></div>` : ''}
+                    ${fat !== null ? `<div class="nutri-item"><span class="nutri-label">🧈 Жиры</span><span class="nutri-value">${fat} г</span></div>` : ''}
+                    ${carbs !== null ? `<div class="nutri-item"><span class="nutri-label">🍚 Углеводы</span><span class="nutri-value">${carbs} г</span></div>` : ''}
+                </div>`;
+            } else {
+                nutritionHtml = `<div class="nutrition-block"><div class="no-nutri">Нет данных о КБЖУ</div></div>`;
+            }
+
+            html += `
+                <div class="product-card">
+                    <div class="product-image">${imageHtml}</div>
+                    <div class="product-info">
+                        <div class="product-title">${escapeHtml(title)}</div>
+                        <div class="brand">🏷️ ${escapeHtml(brand)}</div>
+                        <div class="quantity">📦 ${escapeHtml(quantity)}</div>
+                        ${nutritionHtml}
+                    </div>
+                </div>
+            `;
+        }
+        html += '</div>';
+        container.innerHTML = html;
     }
 
     searchBtn.addEventListener('click', performSearch);
