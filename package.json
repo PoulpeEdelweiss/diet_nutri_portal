@@ -1,0 +1,12 @@
+{
+  "name": "diet_nutri_portal",
+  "version": "1.0.0",
+  "description": "Проект для заботы о твоём здоровье. Подсчёт твоей нормы каллорий для достижения твоих целей и поиск кбжу продуктов",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js"
+  },
+  "dependencies": {
+    
+  }
+}
