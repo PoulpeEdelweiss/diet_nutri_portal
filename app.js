@@ -1,6 +1,7 @@
 // Динамическая маршрутизация блоков
 const contentDiv = document.getElementById('app-content');
 const navBtns = document.querySelectorAll('.nav-btn');
+let currentBlock = null;
 
 // Глобальный контекст для отмены активного поиска
 let searchContext = {
@@ -18,6 +19,11 @@ function abortPendingSearch() {
 
 // Функция загрузки HTML блока и выполнения скриптов внутри него
 async function loadBlock(blockName) {
+    // Не перезагружаем уже активный блок
+    if (currentBlock === blockName) {
+        console.log(`Блок ${blockName} уже загружен, пропускаем`);
+        return;
+    }
     // Отменяем любой висящий поисковый запрос при переключении блоков
     abortPendingSearch();
 
@@ -28,6 +34,7 @@ async function loadBlock(blockName) {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         let html = await response.text();
         contentDiv.innerHTML = html;
+        currentBlock = blockName;
         
         if (blockName === 'search') {
             initSearchModule();
@@ -37,6 +44,7 @@ async function loadBlock(blockName) {
     } catch (error) {
         console.error(error);
         contentDiv.innerHTML = `<div class="message error-text">Ошибка загрузки блока. Проверьте соединение или перезагрузите страницу.</div>`;
+        currentBlock = null;
     }
 }
 
@@ -48,6 +56,7 @@ function initSearchModule() {
     const resultsDiv = document.getElementById('productResults');
     
     if (!searchBtn) return;
+    let currentSearchId = 0;
 
     // Убираем старый контекст для нового экземпляра
     abortPendingSearch();
@@ -70,9 +79,10 @@ function initSearchModule() {
     }
     
     async function performSearch() {
+        console.log('performSearch вызван');
         const query = searchInput.value.trim();
         if (query === '') { showMessage('Введите название продукта'); return; }
-        
+        const searchId = ++currentSearchId;  // каждый новый поиск получает новый ID
         // Отменяем предыдущий запрос, если он ещё выполняется
         abortPendingSearch();
         
@@ -274,6 +284,7 @@ function setupNavigation() {
         btn.addEventListener('click', async () => {
             const blockName = btn.getAttribute('data-block');
             if (!blockName) return;
+            if (currentBlock === blockName) return; // дополнительная защита
             navBtns.forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             await loadBlock(blockName);
