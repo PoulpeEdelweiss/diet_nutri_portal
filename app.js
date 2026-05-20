@@ -2,27 +2,37 @@
 const contentDiv = document.getElementById('app-content');
 const navBtns = document.querySelectorAll('.nav-btn');
 
+// Глобальный контекст для отмены активного поиска
+let searchContext = {
+    controller: null,
+    active: false
+};
+
+function abortPendingSearch() {
+    if (searchContext.controller) {
+        searchContext.controller.abort();
+        searchContext.controller = null;
+    }
+    searchContext.active = false;
+}
+
 // Функция загрузки HTML блока и выполнения скриптов внутри него
 async function loadBlock(blockName) {
-    // Показываем лоадер
+    // Отменяем любой висящий поисковый запрос при переключении блоков
+    abortPendingSearch();
+
     contentDiv.innerHTML = `<div class="loading-placeholder"><div class="spinner"></div><p>Загрузка раздела...</p></div>`;
     
     try {
         const response = await fetch(`blocks/${blockName}.html`);
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         let html = await response.text();
-        
-        // Вставляем HTML в контейнер
         contentDiv.innerHTML = html;
         
-        // После вставки — инициализируем JS конкретного блока
         if (blockName === 'search') {
             initSearchModule();
         } else if (blockName === 'calculator') {
             initCalculatorModule();
-        } else if (blockName === 'welcome') {
-            // welcome блок не требует сложной инициализации
-            console.log('Добро пожаловать');
         }
     } catch (error) {
         console.error(error);
@@ -38,11 +48,15 @@ function initSearchModule() {
     const resultsDiv = document.getElementById('productResults');
     
     if (!searchBtn) return;
+
+    // Убираем старый контекст для нового экземпляра
+    abortPendingSearch();
     
     function showLoader(show) {
         if (loader) loader.style.display = show ? 'flex' : 'none';
     }
     function showMessage(text, isError = false) {
+        if (!resultsDiv) return;
         resultsDiv.innerHTML = `<div class="message" style="${isError ? 'background:#fee2e2; color:#b91c1c' : ''}">${escapeHtml(text)}</div>`;
     }
     function escapeHtml(str) {
@@ -58,78 +72,110 @@ function initSearchModule() {
     async function performSearch() {
         const query = searchInput.value.trim();
         if (query === '') { showMessage('Введите название продукта'); return; }
+        
+        // Отменяем предыдущий запрос, если он ещё выполняется
+        abortPendingSearch();
+        
         showLoader(true);
-        resultsDiv.innerHTML = '';
+        if (resultsDiv) resultsDiv.innerHTML = '';
+        
         const encoded = encodeURIComponent(query);
         const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encoded}&search_simple=1&action=process&json=1&lc=ru&page_size=20`;
+        
+        const controller = new AbortController();
+        searchContext.controller = controller;
+        searchContext.active = true;
+        
         try {
-            const controller = new AbortController();
             const timeout = setTimeout(() => controller.abort(), 14000);
-            const res = await fetch(url, { signal: controller.signal });
+            const res = await fetch(url, {
+                signal: controller.signal,
+                headers: { 'User-Agent': 'NutriPortal-App/1.0 (Educational)' }
+            });
             clearTimeout(timeout);
+            
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
             let products = data?.products || [];
             if (!Array.isArray(products)) products = [];
             const valid = products.filter(p => p && (p.product_name || p.product_name_ru));
+            
+            // Проверяем, что блок поиска всё ещё активен и контейнер существует
+            if (!searchContext.active || !resultsDiv || !document.body.contains(resultsDiv)) {
+                console.log('Поиск отменён – блок уже неактивен');
+                return;
+            }
+            
             if (valid.length === 0) showMessage('Ничего не найдено');
             else renderProducts(valid, resultsDiv);
         } catch (err) {
+            if (!searchContext.active) return; // игнорируем ошибки от старого запроса
             let msg = 'Ошибка загрузки данных. Проверьте соединение.';
             if (err.name === 'AbortError') msg = 'Превышено время ожидания.';
             showMessage(msg, true);
         } finally {
+            if (searchContext.controller === controller) {
+                searchContext.controller = null;
+                searchContext.active = false;
+            }
             showLoader(false);
         }
     }
     
     function renderProducts(products, container) {
-        let html = '<div class="results-grid">';
-        for (const prod of products) {
-            const title = (prod.product_name_ru?.trim()) || prod.product_name || 'Без названия';
-            const brand = prod.brands?.trim() || 'Бренд не указан';
-            const quantity = prod.quantity?.trim() || '—';
-            let nutriClass = '';
-            const imgUrl = prod.image_url || prod.image_front_small_url || null;
-            const n = prod.nutriments || {};
-            const kcal = n['energy-kcal'] !== undefined ? Math.round(n['energy-kcal']) : null;
-            const proteins = n['proteins'] !== undefined ? parseFloat(n['proteins']).toFixed(1) : null;
-            const fat = n['fat'] !== undefined ? parseFloat(n['fat']).toFixed(1) : null;
-            const carbs = n['carbohydrates'] !== undefined ? parseFloat(n['carbohydrates']).toFixed(1) : null;
-            
-            let imageHtml = imgUrl ? `<img src="${imgUrl}" alt="${title}" loading="lazy" onerror="this.parentElement.innerHTML='<div class=\'image-placeholder\'>🥫</div>';">` : `<div class="image-placeholder">🍽️</div>`;
-            let nutritionHtml = '';
-            if (kcal !== null || proteins !== null || fat !== null || carbs !== null) {
-                nutritionHtml = `<div class="nutrition-block">
-                    ${kcal !== null ? `<div class="nutri-item"><span class="nutri-label">🔥 Ккал</span><span class="nutri-value">${kcal}</span></div>` : ''}
-                    ${proteins !== null ? `<div class="nutri-item"><span class="nutri-label">🥩 Белки</span><span class="nutri-value">${proteins} г</span></div>` : ''}
-                    ${fat !== null ? `<div class="nutri-item"><span class="nutri-label">🧈 Жиры</span><span class="nutri-value">${fat} г</span></div>` : ''}
-                    ${carbs !== null ? `<div class="nutri-item"><span class="nutri-label">🍚 Углеводы</span><span class="nutri-value">${carbs} г</span></div>` : ''}
-                </div>`;
-            } else {
-                nutritionHtml = `<div class="nutrition-block"><div class="no-nutri">Нет данных о КБЖУ</div></div>`;
-            }
-            html += `
-                <div class="product-card">
-                    <div class="product-image">${imageHtml}</div>
-                    <div class="product-info">
-                        <div class="product-title">${escapeHtml(title)}</div>
-                        <div class="brand">🏷️ ${escapeHtml(brand)}</div>
-                        <div class="quantity">📦 ${escapeHtml(quantity)}</div>
-                        ${nutritionHtml}
+        try {
+            if (!container || !document.body.contains(container)) return;
+            let html = '<div class="results-grid">';
+            for (const prod of products) {
+                const title = (prod.product_name_ru?.trim()) || prod.product_name || 'Без названия';
+                const brand = prod.brands?.trim() || 'Бренд не указан';
+                const quantity = prod.quantity?.trim() || '—';
+                const imgUrl = prod.image_url || prod.image_front_small_url || null;
+                const n = prod.nutriments || {};
+                const kcal = n['energy-kcal'] !== undefined ? Math.round(n['energy-kcal']) : null;
+                const proteins = n['proteins'] !== undefined ? parseFloat(n['proteins']).toFixed(1) : null;
+                const fat = n['fat'] !== undefined ? parseFloat(n['fat']).toFixed(1) : null;
+                const carbs = n['carbohydrates'] !== undefined ? parseFloat(n['carbohydrates']).toFixed(1) : null;
+                
+                let imageHtml = imgUrl ? `<img src="${imgUrl}" alt="${title}" loading="lazy" onerror="this.parentElement.innerHTML='<div class=\'image-placeholder\'>🥫</div>';">` : `<div class="image-placeholder">🍽️</div>`;
+                let nutritionHtml = '';
+                if (kcal !== null || proteins !== null || fat !== null || carbs !== null) {
+                    nutritionHtml = `<div class="nutrition-block">
+                        ${kcal !== null ? `<div class="nutri-item"><span class="nutri-label">🔥 Ккал</span><span class="nutri-value">${kcal}</span></div>` : ''}
+                        ${proteins !== null ? `<div class="nutri-item"><span class="nutri-label">🥩 Белки</span><span class="nutri-value">${proteins} г</span></div>` : ''}
+                        ${fat !== null ? `<div class="nutri-item"><span class="nutri-label">🧈 Жиры</span><span class="nutri-value">${fat} г</span></div>` : ''}
+                        ${carbs !== null ? `<div class="nutri-item"><span class="nutri-label">🍚 Углеводы</span><span class="nutri-value">${carbs} г</span></div>` : ''}
+                    </div>`;
+                } else {
+                    nutritionHtml = `<div class="nutrition-block"><div class="no-nutri">Нет данных о КБЖУ</div></div>`;
+                }
+                html += `
+                    <div class="product-card">
+                        <div class="product-image">${imageHtml}</div>
+                        <div class="product-info">
+                            <div class="product-title">${escapeHtml(title)}</div>
+                            <div class="brand">🏷️ ${escapeHtml(brand)}</div>
+                            <div class="quantity">📦 ${escapeHtml(quantity)}</div>
+                            ${nutritionHtml}
+                        </div>
                     </div>
-                </div>
-            `;
+                `;
+            }
+            html += '</div>';
+            container.innerHTML = html;
+        } catch (err) {
+            console.warn('Ошибка отрисовки:', err);
+            if (container && document.body.contains(container)) {
+                container.innerHTML = `<div class="message error-text">Ошибка отображения результатов</div>`;
+            }
         }
-        html += '</div>';
-        container.innerHTML = html;
     }
     
     searchBtn.addEventListener('click', performSearch);
     if (searchInput) searchInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') performSearch(); });
 }
 
-// ------ Модуль КАЛЬКУЛЯТОРА нормы калорий ------
+// ------ Модуль КАЛЬКУЛЯТОРА (без изменений, оставляем как есть) ------
 function initCalculatorModule() {
     const calcBtn = document.getElementById('calcBtn');
     const ageInput = document.getElementById('age');
@@ -154,74 +200,29 @@ function initCalculatorModule() {
             else return 447.593 + 9.247 * weight + 3.098 * height - 4.330 * age;
         }
     }
-    // function getMacros(weight, calories) {
-    //     let proteinG = weight * 1.8;
-    //     let fatG = weight * 0.8;
-    //     let proteinCal = proteinG * 4, fatCal = fatG * 9;
-    //     let carbCal = Math.max(0, calories - proteinCal - fatCal);
-    //     return { protein: Math.round(proteinG), fat: Math.round(fatG), carbs: Math.round(carbCal / 4) };
-    // }
     function getMacros(weight, calories, goalType) {
         let proteinPerKg, fatPerKg;
         switch (goalType) {
-            case 'lose':     // снижение веса
-                proteinPerKg = 2.2;
-                fatPerKg = 0.7;
-                break;
-            case 'gain':     // набор массы
-                proteinPerKg = 1.8;
-                fatPerKg = 0.9;
-                break;
-            default:         // поддержание веса
-                proteinPerKg = 1.8;
-                fatPerKg = 0.8;
-            }
+            case 'lose': proteinPerKg = 2.2; fatPerKg = 0.7; break;
+            case 'gain': proteinPerKg = 1.8; fatPerKg = 0.9; break;
+            default: proteinPerKg = 1.8; fatPerKg = 0.8;
+        }
         const proteinG = weight * proteinPerKg;
         const fatG = weight * fatPerKg;
         const proteinCal = proteinG * 4;
         const fatCal = fatG * 9;
         let carbCal = calories - proteinCal - fatCal;
-        if (carbCal < 0) carbCal = 0; // защита от отрицательных углеводов
+        if (carbCal < 0) carbCal = 0;
         const carbG = carbCal / 4;
-        return {
-            protein: Math.round(proteinG),
-            fat: Math.round(fatG),
-            carbs: Math.round(carbG)
-        };
+        return { protein: Math.round(proteinG), fat: Math.round(fatG), carbs: Math.round(carbG) };
     }
-
-
-    // function renderKcalResults(tdee, weight) {
-    //     const maintain = Math.round(tdee);
-    //     const lose = Math.round(tdee * 0.85);
-    //     const gain = Math.round(tdee * 1.10);
-    //     const macrosM = getMacros(weight, maintain);
-    //     const macrosL = getMacros(weight, lose);
-    //     const macrosG = getMacros(weight, gain);
-    //     resultsDiv.innerHTML = `
-    //         <div class="kcal-card"><h4>⚖️ Поддержание веса</h4><div class="kcal-value">${maintain} ккал/сутки</div>
-    //         <div class="macro-row"><span>Белки</span><span>${macrosM.protein} г</span></div>
-    //         <div class="macro-row"><span>Жиры</span><span>${macrosM.fat} г</span></div>
-    //         <div class="macro-row"><span>Углеводы</span><span>${macrosM.carbs} г</span></div></div>
-    //         <div class="kcal-card"><h4>📉 Снижение веса</h4><div class="kcal-value">${lose} ккал/сутки</div>
-    //         <div class="macro-row"><span>Белки</span><span>${macrosL.protein} г</span></div>
-    //         <div class="macro-row"><span>Жиры</span><span>${macrosL.fat} г</span></div>
-    //         <div class="macro-row"><span>Углеводы</span><span>${macrosL.carbs} г</span></div><small>дефицит 15%</small></div>
-    //         <div class="kcal-card"><h4>💪 Набор массы</h4><div class="kcal-value">${gain} ккал/сутки</div>
-    //         <div class="macro-row"><span>Белки</span><span>${macrosG.protein} г</span></div>
-    //         <div class="macro-row"><span>Жиры</span><span>${macrosG.fat} г</span></div>
-    //         <div class="macro-row"><span>Углеводы</span><span>${macrosG.carbs} г</span></div><small>профицит 10%</small></div>
-    //     `;
-    // }
     function renderKcalResults(tdee, weight) {
         const maintain = Math.round(tdee);
         const lose = Math.round(tdee * 0.85);
         const gain = Math.round(tdee * 1.10);
-
         const macrosMaintain = getMacros(weight, maintain, 'maintain');
         const macrosLose = getMacros(weight, lose, 'lose');
         const macrosGain = getMacros(weight, gain, 'gain');
-
         resultsDiv.innerHTML = `
             <div class="kcal-card">
                 <h4>⚖️ Поддержание веса</h4>
@@ -249,12 +250,6 @@ function initCalculatorModule() {
             </div>
         `;
     }
-
-
-
-
-
-
     function calculateAndDisplay() {
         errorSpan.innerText = '';
         const age = parseInt(ageInput.value);
@@ -270,25 +265,22 @@ function initCalculatorModule() {
         renderKcalResults(tdee, weight);
     }
     calcBtn.addEventListener('click', calculateAndDisplay);
-    calculateAndDisplay(); // начальный расчёт
+    calculateAndDisplay();
 }
 
-// Навигация: обработка кнопок, подсветка активного пункта
+// Навигация
 function setupNavigation() {
     navBtns.forEach(btn => {
         btn.addEventListener('click', async () => {
             const blockName = btn.getAttribute('data-block');
             if (!blockName) return;
-            // обновить активную кнопку
             navBtns.forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             await loadBlock(blockName);
-            // после загрузки блока — если это search или calculator, они уже инициализируются внутри loadBlock
         });
     });
 }
 
-// Загружаем welcome блок по умолчанию
 window.addEventListener('DOMContentLoaded', async () => {
     setupNavigation();
     await loadBlock('welcome');
